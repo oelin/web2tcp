@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>web2tcp</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    #messages {
+      border: 1px solid #ccc;
+      padding: 10px;
+      height: 200px;
+      overflow-y: scroll;
+      margin-bottom: 10px;
+      background-color: #f8f9fa;
+    }
+    #messages p {
+      margin: 5px 0;
+      font-family: monospace;
+    }
+    #message {
+      font-family: monospace;
+      width: 100%;
+      height: 100px;
+      resize: none;
+      margin-bottom: 10px;
+    }
+    .input-group {
+      margin-bottom: 10px;
+    }
+    #interface.disabled {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    #status.connected {
+      color: green;
+    }
+    #status.disconnected {
+      color: red;
+    }
+    .received-prefix {
+      color: green;
+    }
+    .error-prefix {
+      color: red;
+    }
+  </style>
+</head>
+<body class="container">
+  <h1 class="mb-4">web2tcp</h1>
+  <div class="input-group mb-3">
+    <div class="input-group-prepend">
+      <span class="input-group-text" id="basic-addon1">Host</span>
+    </div>
+    <input type="text" id="host" class="form-control" placeholder="Enter host">
+  </div>
+  <div class="input-group mb-3">
+    <div class="input-group-prepend">
+      <span class="input-group-text" id="basic-addon2">Port</span>
+    </div>
+    <input type="text" id="port" class="form-control" placeholder="Enter port">
+  </div>
+  <button id="connect" class="btn btn-primary mb-3">Connect</button>
+  <div id="status" class="mb-3 disconnected">Status: disconnected</div>
+  <div id="interface" class="disabled">
+    <pre id="messages" class="mb-3"></pre>
+    <div class="input-group">
+      <textarea id="message" class="form-control" placeholder="Enter message"></textarea>
+    </div>
+    <button id="send" class="btn btn-success mb-3">Send</button>
+    <button id="disconnect" class="btn btn-danger mb-3">Disconnect</button>
+    <button id="clear-log" class="btn btn-secondary mb-3">Clear Log</button>
+  </div>
+  <script>
+    const socket = io();
+
+    document.getElementById('connect').addEventListener('click', () => {
+      const host = document.getElementById('host').value;
+      const port = document.getElementById('port').value;
+      socket.emit('create', { host, port });
+    });
+
+    document.getElementById('send').addEventListener('click', () => {
+      const message = document.getElementById('message').value;
+      const content = btoa(message); // Encode to base64
+      socket.emit('send', { content });
+      document.getElementById('message').value = '';
+      addMessage(`Sent: ${message}`, 'sent');
+    });
+
+    document.getElementById('disconnect').addEventListener('click', () => {
+      socket.emit('destroy');
+    });
+
+    document.getElementById('clear-log').addEventListener('click', () => {
+      document.getElementById('messages').innerHTML = '';
+    });
+
+    socket.on('status', (status) => {
+      const statusDiv = document.getElementById('status');
+      statusDiv.textContent = `Status: ${status}`;
+      if (status === 'connected') {
+        statusDiv.classList.remove('disconnected');
+        statusDiv.classList.add('connected');
+        document.getElementById('interface').classList.remove('disabled');
+      } else {
+        statusDiv.classList.remove('connected');
+        statusDiv.classList.add('disconnected');
+        document.getElementById('interface').classList.add('disabled');
+      }
+    });
+
+    socket.on('receive', (data) => {
+      const message = atob(data); // Decode from base64
+      addMessage(`Received: ${message}`, 'received');
+    });
+
+    socket.on('error', (err) => {
+      addMessage(`Error: ${err}`, 'error');
+    });
+
+    function addMessage(message, type) {
+      const p = document.createElement('p');
+      if (type === 'received') {
+        p.innerHTML = `<span class="received-prefix">Received:</span> <span class="message-content"></span>`;
+        p.querySelector('.message-content').textContent = message
+
+      } else if (type === 'error') {
+        p.innerHTML = `<span class="error-prefix">Error:</span> <span class="message-content"></span>`;
+        p.querySelector('.message-content').textContent = message
+
+      } else {
+        p.textContent = message;
+      }
+      document.getElementById('messages').appendChild(p);
+      p.scrollIntoView();
+    }
+  </script>
+</body>
+</html>
